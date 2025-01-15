@@ -45,6 +45,63 @@ class DirectorRoute(Resource):
         return {"message": "Директор має доступ до перегляду даних!"}, 200
 
 
+class UserManagementAPI(Resource):
+    @role_required('admin')  # Тільки адміністратор може виконувати ці дії
+    def get(self):
+        """Отримати список усіх користувачів."""
+        users = User.query.all()
+        return [{"id": u.id, "username": u.username, "role": u.role} for u in users], 200
+
+    @role_required('admin')
+    def post(self):
+        """Додати нового користувача."""
+        data = request.json
+        if not data.get('username') or not data.get('password') or not data.get('role'):
+            return {"message": "Необхідно вказати всі поля: username, password, role"}, 400
+        
+        # Перевіряємо, чи існує вже такий користувач
+        if User.query.filter_by(username=data['username']).first():
+            return {"message": "Користувач із таким username вже існує"}, 400
+        
+        hashed_password = generate_password_hash(data['password'], method='pbkdf2:sha256')
+        new_user = User(username=data['username'], password=hashed_password, role=data['role'])
+        db.session.add(new_user)
+        db.session.commit()
+        return {"message": "Користувач створений", "id": new_user.id}, 201
+
+    @role_required('admin')
+    def put(self):
+        """Редагувати користувача."""
+        data = request.json
+        user = User.query.get(data['id'])
+        if not user:
+            return {"message": "Користувача не знайдено"}, 404
+        
+        user.username = data.get('username', user.username)
+        user.role = data.get('role', user.role)
+        if data.get('password'):
+            user.password = generate_password_hash(data['password'], method='pbkdf2:sha256')
+        
+        db.session.commit()
+        return {"message": "Користувач оновлений"}, 200
+
+    @role_required('admin')
+    def delete(self):
+        """Видалити користувача."""
+        user_id = request.args.get('id')  # Отримуємо ID з параметрів
+        user = User.query.get(user_id)
+        if not user:
+            return {"message": "Користувача не знайдено"}, 404
+        
+        db.session.delete(user)
+        db.session.commit()
+        return {"message": "Користувач видалений"}, 200
+
+# Додаємо маршрут до API
+api.add_resource(UserManagementAPI, '/api/users')
+
+
+
 class UserRegistration(Resource):
     def post(self):
         data = request.json
