@@ -19,3 +19,9 @@ class Defect(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     component_id = db.Column(db.Integer, db.ForeignKey('component.id'), nullable=False)
     reason = db.Column(db.String(200), nullable=False)
+    
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password = db.Column(db.String(200), nullable=False)  # Хешований пароль
+    role = db.Column(db.String(50), nullable=False)  # admin, склад, виробництво, директор

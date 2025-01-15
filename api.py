@@ -1,8 +1,40 @@
 from flask_restful import Resource, Api
-from flask import request
-from models import db, Component, Order
+from flask import request, jsonify
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from models import db, User, Component, Order
 
 api = Api()
+
+class UserRegistration(Resource):
+    def post(self):
+        data = request.json
+        if User.query.filter_by(username=data['username']).first():
+            return {"message": "Користувач із таким ім'ям вже існує"}, 400
+
+        new_user = User(
+            username=data['username'],
+            password=data['password'],  # Тут краще використовувати хешування
+            role=data['role']
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        return {"message": "Користувач успішно створений"}, 201
+
+class UserLogin(Resource):
+    def post(self):
+        data = request.json
+        user = User.query.filter_by(username=data['username']).first()
+        if not user or user.password != data['password']:
+            return {"message": "Неправильний логін або пароль"}, 401
+
+        access_token = create_access_token(identity={"username": user.username, "role": user.role})
+        return {"access_token": access_token}, 200
+
+class ProtectedRoute(Resource):
+    @jwt_required()
+    def get(self):
+        current_user = get_jwt_identity()
+        return {"message": f"Ласкаво просимо, {current_user['username']}!"}, 200
 
 class OrderAPI(Resource):
     def get(self):
@@ -83,6 +115,19 @@ class OrderAPI(Resource):
         db.session.commit()
         return {"message": "Замовлення видалено"}, 200
 
+# Додаємо маршрут, доступний тільки адміну
+class AdminOnlyRoute(Resource):
+    @jwt_required()
+    def get(self):
+        current_user = get_jwt_identity()
+        if current_user['role'] != 'admin':
+            return {"message": "Доступ заборонено"}, 403
+
+        return {"message": "Ласкаво просимо, адмін!"}, 200
+
 
 # Додаємо маршрут для OrderAPI
 api.add_resource(OrderAPI, '/api/orders')
+api.add_resource(UserRegistration, '/api/register')
+api.add_resource(UserLogin, '/api/login')
+api.add_resource(ProtectedRoute, '/api/protected')

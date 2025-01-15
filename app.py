@@ -1,17 +1,24 @@
 from flask import Flask
+from flask_jwt_extended import JWTManager
 from models import db, Component, Order, Defect
 from api import api
+from dotenv import load_dotenv
+import os
+
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///crm.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['JWT_SECRET_KEY'] = 'Pilat_da'  # Замість 'your-secret-key' використовуйте свій ключ
 
-# Ініціалізуємо db з додатком
+load_dotenv()
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
+
 db.init_app(app)
-
-# ініціалізація API
 api.init_app(app)
 
+# Налаштовуємо JWT
+jwt = JWTManager(app)
 
 with app.app_context():
     db.create_all()
