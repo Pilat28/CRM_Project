@@ -4,6 +4,8 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 from models import db, User, Component, Order
 from functools import wraps
 from werkzeug.security import generate_password_hash
+from flask_jwt_extended import get_jwt
+
 
 api = Api()
 
@@ -14,7 +16,8 @@ def role_required(role):
         @jwt_required()
         def wrapper(*args, **kwargs):
             current_user = get_jwt_identity()
-            if current_user['role'] != role:
+            jwt_role = get_jwt()['role']
+            if jwt_role != role:
                 return jsonify({"message": "Доступ заборонено"}), 403
             return func(*args, **kwargs)
         return wrapper
@@ -71,7 +74,8 @@ class UserLogin(Resource):
             return {"message": "Неправильний логін або пароль"}, 401
         
         # Генеруємо токен
-        access_token = create_access_token(identity={"username": user.username, "role": user.role})
+        access_token = create_access_token(identity=user.username, additional_claims={"role": user.role})
+
         return {"access_token": access_token}, 200
 
 class ProtectedRoute(Resource):
