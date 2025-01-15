@@ -44,7 +44,7 @@ class DirectorRoute(Resource):
     def get(self):
         return {"message": "Директор має доступ до перегляду даних!"}, 200
 
-
+# керування користувачами
 class UserManagementAPI(Resource):
     @role_required('admin')  # Тільки адміністратор може виконувати ці дії
     def get(self):
@@ -96,6 +96,61 @@ class UserManagementAPI(Resource):
         db.session.delete(user)
         db.session.commit()
         return {"message": "Користувач видалений"}, 200
+    
+# Керування компонентами
+class ComponentAPI(Resource):
+    @jwt_required()
+    def get(self):
+        # Отримуємо всі компоненти з бази даних
+        components = Component.query.all()
+        return [
+            {"id": c.id, "name": c.name, "quantity": c.quantity}
+            for c in components
+        ], 200
+
+    @jwt_required()
+    @role_required('admin')  # Доступ лише для адмінів
+    def post(self):
+        data = request.json
+        # Перевіряємо, чи всі дані передано
+        if not data.get('name') or not data.get('quantity'):
+            return {"message": "Назва та кількість є обов'язковими"}, 400
+        
+        # Додаємо компонент
+        new_component = Component(name=data['name'], quantity=data['quantity'])
+        db.session.add(new_component)
+        db.session.commit()
+        return {"message": "Компонент створено", "id": new_component.id}, 201
+
+    @jwt_required()
+    @role_required('admin')
+    def put(self):
+        data = request.json
+        component = Component.query.get(data['id'])
+        if not component:
+            return {"message": "Компонент не знайдено"}, 404
+        
+        # Оновлюємо дані компонента
+        component.name = data.get('name', component.name)
+        component.quantity = data.get('quantity', component.quantity)
+        db.session.commit()
+        return {"message": "Компонент оновлено"}, 200
+
+    @jwt_required()
+    @role_required('admin')
+    def delete(self):
+        component_id = request.args.get('id')
+        if not component_id:
+            return {"message": "ID не надано"}, 400
+        
+        component = Component.query.get(component_id)
+        if not component:
+            return {"message": "Компонент не знайдено"}, 404
+
+        db.session.delete(component)
+        db.session.commit()
+        return {"message": "Компонент видалено"}, 200
+
 
 # Додаємо маршрут до API
 api.add_resource(UserManagementAPI, '/api/users')
@@ -152,6 +207,7 @@ class ProtectedRoute(Resource):
         return {"message": f"Ласкаво просимо, {current_user['username']}!"}, 200
 
 class OrderAPI(Resource):
+    @jwt_required()
     def get(self):
         """Отримати список усіх замовлень."""
         orders = Order.query.all()
@@ -165,11 +221,11 @@ class OrderAPI(Resource):
             } for o in orders
         ], 200
 
+    @jwt_required()
     def post(self):
         """Створити нове замовлення."""
         data = request.json
 
-        # Якщо тип замовлення "Літак", автоматично розраховуємо комплектуючі
         if data['order_type'] == "Літак":
             quantity = data['quantity']
             components = []
@@ -183,15 +239,11 @@ class OrderAPI(Resource):
                     "name": comp['name'],
                     "quantity": comp['quantity'] * quantity
                 })
-
-        # Якщо тип замовлення "Розхідні матеріали", просто беремо список компонентів із запиту
         elif data['order_type'] == "Розхідні матеріали":
             components = data['components']
-
         else:
             return {"message": "Невідомий тип замовлення"}, 400
 
-        # Створюємо замовлення
         new_order = Order(
             order_type=data['order_type'],
             quantity=data['quantity'],
@@ -202,6 +254,7 @@ class OrderAPI(Resource):
         db.session.commit()
         return {"message": "Замовлення створено", "id": new_order.id}, 201
 
+    @jwt_required()
     def put(self):
         """Оновити замовлення."""
         data = request.json
@@ -216,6 +269,7 @@ class OrderAPI(Resource):
         db.session.commit()
         return {"message": "Замовлення оновлено"}, 200
 
+    @role_required('admin')
     def delete(self):
         """Видалити замовлення."""
         order_id = request.args.get('id')  # Отримуємо id з параметрів URL
@@ -253,3 +307,4 @@ api.add_resource(AdminOnlyRoute, '/api/admin')
 api.add_resource(WarehouseRoute, '/api/warehouse')
 api.add_resource(ProductionRoute, '/api/production')
 api.add_resource(DirectorRoute, '/api/director')
+api.add_resource(ComponentAPI, '/api/components')
