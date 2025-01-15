@@ -1,4 +1,6 @@
 from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from models import db, Component, Order, Defect
 from api import api
@@ -15,6 +17,7 @@ load_dotenv()
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
 
 db.init_app(app)
+migrate = Migrate(app, db)  # Ініціалізація Flask-Migrate
 api.init_app(app)
 
 # Налаштовуємо JWT

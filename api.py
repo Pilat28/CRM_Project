@@ -2,8 +2,43 @@ from flask_restful import Resource, Api
 from flask import request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from models import db, User, Component, Order
+from functools import wraps
 
 api = Api()
+
+
+def role_required(role):
+    def decorator(func):
+        @wraps(func)
+        @jwt_required()
+        def wrapper(*args, **kwargs):
+            current_user = get_jwt_identity()
+            if current_user['role'] != role:
+                return jsonify({"message": "Доступ заборонено"}), 403
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
+class AdminOnlyRoute(Resource):
+    @role_required('admin')
+    def get(self):
+        return {"message": "Ласкаво просимо, адмін!"}, 200
+
+class WarehouseRoute(Resource):
+    @role_required('warehouse')
+    def post(self):
+        return {"message": "Доступ до складу дозволено!"}, 200
+
+class ProductionRoute(Resource):
+    @role_required('production')
+    def get(self):
+        return {"message": "Виробництво готове до роботи!"}, 200
+
+class DirectorRoute(Resource):
+    @role_required('director')
+    def get(self):
+        return {"message": "Директор має доступ до перегляду даних!"}, 200
+
 
 class UserRegistration(Resource):
     def post(self):
@@ -131,3 +166,7 @@ api.add_resource(OrderAPI, '/api/orders')
 api.add_resource(UserRegistration, '/api/register')
 api.add_resource(UserLogin, '/api/login')
 api.add_resource(ProtectedRoute, '/api/protected')
+api.add_resource(AdminOnlyRoute, '/api/admin')
+api.add_resource(WarehouseRoute, '/api/warehouse')
+api.add_resource(ProductionRoute, '/api/production')
+api.add_resource(DirectorRoute, '/api/director')
