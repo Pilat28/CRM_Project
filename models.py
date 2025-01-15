@@ -23,5 +23,5 @@ class Defect(db.Model):
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    password = db.Column(db.String(200), nullable=False)  # Хешований пароль
-    role = db.Column(db.String(50), nullable=False)  # admin, склад, виробництво, директор
+    password = db.Column(db.String(200), nullable=False)  # Для хешованих паролів потрібно більше місця
+    role = db.Column(db.String(20), nullable=False)

@@ -3,6 +3,7 @@ from flask import request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from models import db, User, Component, Order
 from functools import wraps
+from werkzeug.security import generate_password_hash
 
 api = Api()
 
@@ -43,25 +44,33 @@ class DirectorRoute(Resource):
 class UserRegistration(Resource):
     def post(self):
         data = request.json
-        if User.query.filter_by(username=data['username']).first():
-            return {"message": "Користувач із таким ім'ям вже існує"}, 400
-
-        new_user = User(
-            username=data['username'],
-            password=data['password'],  # Тут краще використовувати хешування
-            role=data['role']
-        )
+        
+        # Хешуємо пароль
+        from werkzeug.security import generate_password_hash
+        hashed_password = generate_password_hash(data['password'], method='pbkdf2:sha256')
+        
+        # Створюємо нового користувача
+        new_user = User(username=data['username'], password=hashed_password, role=data['role'])
         db.session.add(new_user)
         db.session.commit()
+        
         return {"message": "Користувач успішно створений"}, 201
 
 class UserLogin(Resource):
     def post(self):
         data = request.json
+        
+        # Шукаємо користувача у базі
         user = User.query.filter_by(username=data['username']).first()
-        if not user or user.password != data['password']:
+        if not user:
             return {"message": "Неправильний логін або пароль"}, 401
-
+        
+        # Перевіряємо хешований пароль
+        from werkzeug.security import check_password_hash
+        if not check_password_hash(user.password, data['password']):
+            return {"message": "Неправильний логін або пароль"}, 401
+        
+        # Генеруємо токен
         access_token = create_access_token(identity={"username": user.username, "role": user.role})
         return {"access_token": access_token}, 200
 
