@@ -5,6 +5,7 @@ from models import db, User, Component, Order
 from functools import wraps
 from werkzeug.security import generate_password_hash
 from flask_jwt_extended import get_jwt
+import json
 
 
 api = Api()
@@ -48,6 +49,10 @@ class UserRegistration(Resource):
     def post(self):
         data = request.json
         
+        # Перевірка, чи існує користувач із таким ім'ям
+        if User.query.filter_by(username=data['username']).first():
+            return {"message": "Користувач з таким іменем вже існує"}, 400
+        
         # Хешуємо пароль
         from werkzeug.security import generate_password_hash
         hashed_password = generate_password_hash(data['password'], method='pbkdf2:sha256')
@@ -59,22 +64,27 @@ class UserRegistration(Resource):
         
         return {"message": "Користувач успішно створений"}, 201
 
+from flask import jsonify
+from flask_jwt_extended import create_access_token
+import json  # Для конвертації словника у рядок
+
 class UserLogin(Resource):
     def post(self):
         data = request.json
-        
+
         # Шукаємо користувача у базі
         user = User.query.filter_by(username=data['username']).first()
         if not user:
             return {"message": "Неправильний логін або пароль"}, 401
-        
+
         # Перевіряємо хешований пароль
         from werkzeug.security import check_password_hash
         if not check_password_hash(user.password, data['password']):
             return {"message": "Неправильний логін або пароль"}, 401
-        
+
         # Генеруємо токен
-        access_token = create_access_token(identity=user.username, additional_claims={"role": user.role})
+        identity = json.dumps({"username": user.username, "role": user.role})  # Конвертуємо словник у рядок
+        access_token = create_access_token(identity=identity)
 
         return {"access_token": access_token}, 200
 
@@ -164,10 +174,13 @@ class OrderAPI(Resource):
         return {"message": "Замовлення видалено"}, 200
 
 # Додаємо маршрут, доступний тільки адміну
+import json
+
 class AdminOnlyRoute(Resource):
     @jwt_required()
     def get(self):
-        current_user = get_jwt_identity()
+        # Отримуємо токен і декодуємо JSON-рядок у словник
+        current_user = json.loads(get_jwt_identity())
         if current_user['role'] != 'admin':
             return {"message": "Доступ заборонено"}, 403
 
