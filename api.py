@@ -128,20 +128,20 @@ import json  # Для конвертації словника у рядок
 class UserLogin(Resource):
     def post(self):
         data = request.json
-
+        
         # Шукаємо користувача у базі
         user = User.query.filter_by(username=data['username']).first()
         if not user:
             return {"message": "Неправильний логін або пароль"}, 401
-
+        
         # Перевіряємо хешований пароль
         from werkzeug.security import check_password_hash
         if not check_password_hash(user.password, data['password']):
             return {"message": "Неправильний логін або пароль"}, 401
-
-        # Генеруємо токен
-        identity = json.dumps({"username": user.username, "role": user.role})  # Конвертуємо словник у рядок
-        access_token = create_access_token(identity=identity)
+        
+        # Генеруємо токен з додатковими claims
+        additional_claims = {"role": user.role}
+        access_token = create_access_token(identity=user.username, additional_claims=additional_claims)
 
         return {"access_token": access_token}, 200
 
