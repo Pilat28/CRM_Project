@@ -17,16 +17,21 @@ def role_required(role):
         @jwt_required()
         def wrapper(*args, **kwargs):
             current_user = get_jwt_identity()
-            jwt_role = get_jwt()['role']
-            if jwt_role != role:
+            claims = get_jwt()
+            if 'role' not in claims:
+                return jsonify({"message": "Роль не вказана в токені"}), 403
+            if claims['role'] != role:
                 return jsonify({"message": "Доступ заборонено"}), 403
             return func(*args, **kwargs)
         return wrapper
     return decorator
 
 class AdminOnlyRoute(Resource):
-    @role_required('admin')
+    @jwt_required()
     def get(self):
+        claims = get_jwt()
+        if claims.get('role') != 'admin':
+            return {"message": "Доступ заборонено"}, 403
         return {"message": "Ласкаво просимо, адмін!"}, 200
 
 class WarehouseRoute(Resource):
@@ -97,6 +102,46 @@ class UserManagementAPI(Resource):
         db.session.commit()
         return {"message": "Користувач видалений"}, 200
     
+# Редагування користувачів
+class UserEdit(Resource):
+    @jwt_required()
+    @role_required('admin')
+    def put(self):
+        data = request.json
+        user_id = data.get('id')
+        if not user_id:
+            return {"message": "ID користувача обов'язкове"}, 400
+
+        user = User.query.get(user_id)
+        if not user:
+            return {"message": "Користувача не знайдено"}, 404
+
+        # Оновлення полів
+        user.username = data.get('username', user.username)
+        user.role = data.get('role', user.role)
+        if data.get('password'):
+            user.password = generate_password_hash(data['password'], method='pbkdf2:sha256')
+        
+        db.session.commit()
+        return {"message": "Користувач оновлений"}, 200
+
+# Видалення користувачів
+class UserDelete(Resource):
+    @jwt_required()
+    @role_required('admin')
+    def delete(self):
+        user_id = request.args.get('id')
+        user = User.query.get(user_id)
+        if not user:
+            return {"message": "Користувача не знайдено"}, 404
+
+        db.session.delete(user)
+        db.session.commit()
+        return {"message": "Користувач видалений"}, 200
+
+
+
+
 # Керування компонентами
 class ComponentAPI(Resource):
     @jwt_required()
@@ -208,81 +253,76 @@ class ProtectedRoute(Resource):
 
 class OrderAPI(Resource):
     @jwt_required()
-    def get(self):
-        """Отримати список усіх замовлень."""
-        orders = Order.query.all()
-        return [
-            {
-                "id": o.id,
-                "order_type": o.order_type,
-                "quantity": o.quantity,
-                "components": o.components,
-                "status": o.status
-            } for o in orders
-        ], 200
-
-    @jwt_required()
     def post(self):
         """Створити нове замовлення."""
         data = request.json
 
         if data['order_type'] == "Літак":
             quantity = data['quantity']
-            components = []
-            base_components = [
-                {"name": "Сервоприводи", "quantity": 8},
-                {"name": "Камери", "quantity": 2},
-                {"name": "Кабанчики", "quantity": 6}
+            components_needed = [
+                {"name": "Сервоприводи", "quantity": 8 * quantity},
+                {"name": "Камери", "quantity": 2 * quantity},
+                {"name": "Кабанчики", "quantity": 6 * quantity}
             ]
-            for comp in base_components:
-                components.append({
-                    "name": comp['name'],
-                    "quantity": comp['quantity'] * quantity
-                })
+
+            # Перевіряємо, чи всі компоненти є в достатній кількості
+            missing_components = []
+            for component in components_needed:
+                stock_item = Component.query.filter_by(name=component['name']).first()
+                if not stock_item or stock_item.quantity < component['quantity']:
+                    missing_quantity = component['quantity'] - (stock_item.quantity if stock_item else 0)
+                    missing_components.append({"name": component['name'], "quantity": missing_quantity})
+
+            # Якщо є відсутні компоненти
+            if missing_components:
+                # Формуємо замовлення на поповнення складу
+                new_order = Order(
+                    order_type="Складське поповнення",
+                    quantity=1,  # Це умовне значення
+                    components=missing_components,
+                    status="Очікує на поповнення складу"
+                )
+                db.session.add(new_order)
+                db.session.commit()
+                return {
+                    "message": "Замовлення передано на склад для поповнення компонентів",
+                    "missing_components": missing_components,
+                    "order_id": new_order.id
+                }, 201
+
+            # Якщо всі компоненти є, створюємо замовлення на виробництво
+            new_order = Order(
+                order_type=data['order_type'],
+                quantity=quantity,
+                components=components_needed,
+                status="Готове до виконання"
+            )
+            # Зменшуємо кількість компонентів на складі
+            for component in components_needed:
+                stock_item = Component.query.filter_by(name=component['name']).first()
+                if stock_item:
+                    stock_item.quantity -= component['quantity']
+
+            db.session.add(new_order)
+            db.session.commit()
+            return {"message": "Замовлення створено", "id": new_order.id}, 201
+
         elif data['order_type'] == "Розхідні матеріали":
             components = data['components']
+
+            new_order = Order(
+                order_type=data['order_type'],
+                quantity=data['quantity'],
+                components=components,
+                status="Очікує"
+            )
+            db.session.add(new_order)
+            db.session.commit()
+            return {"message": "Замовлення створено", "id": new_order.id}, 201
+
         else:
             return {"message": "Невідомий тип замовлення"}, 400
 
-        new_order = Order(
-            order_type=data['order_type'],
-            quantity=data['quantity'],
-            components=components,
-            status="Очікує"
-        )
-        db.session.add(new_order)
-        db.session.commit()
-        return {"message": "Замовлення створено", "id": new_order.id}, 201
-
-    @jwt_required()
-    def put(self):
-        """Оновити замовлення."""
-        data = request.json
-        order = Order.query.get(data['id'])
-        if not order:
-            return {"message": "Замовлення не знайдено"}, 404
-
-        order.quantity = data.get('quantity', order.quantity)
-        order.components = data.get('components', order.components)
-        order.status = data.get('status', order.status)
-
-        db.session.commit()
-        return {"message": "Замовлення оновлено"}, 200
-
-    @role_required('admin')
-    def delete(self):
-        """Видалити замовлення."""
-        order_id = request.args.get('id')  # Отримуємо id з параметрів URL
-        if not order_id:
-            return {"message": "ID не надано"}, 400
-
-        order = Order.query.get(order_id)
-        if not order:
-            return {"message": "Замовлення не знайдено"}, 404
-
-        db.session.delete(order)
-        db.session.commit()
-        return {"message": "Замовлення видалено"}, 200
 
 # Додаємо маршрут, доступний тільки адміну
 import json
@@ -308,3 +348,5 @@ api.add_resource(WarehouseRoute, '/api/warehouse')
 api.add_resource(ProductionRoute, '/api/production')
 api.add_resource(DirectorRoute, '/api/director')
 api.add_resource(ComponentAPI, '/api/components')
+api.add_resource(UserEdit, '/api/users/edit')
+api.add_resource(UserDelete, '/api/users/delete')
