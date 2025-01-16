@@ -253,6 +253,20 @@ class ProtectedRoute(Resource):
 
 class OrderAPI(Resource):
     @jwt_required()
+    def get(self):
+        """Отримати список усіх замовлень."""
+        orders = Order.query.all()
+        return [
+            {
+                "id": o.id,
+                "order_type": o.order_type,
+                "quantity": o.quantity,
+                "components": o.components,
+                "status": o.status
+            } for o in orders
+        ], 200
+
+    @jwt_required()
     def post(self):
         """Створити нове замовлення."""
         data = request.json
