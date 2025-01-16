@@ -139,6 +139,41 @@ class UserDelete(Resource):
         db.session.commit()
         return {"message": "Користувач видалений"}, 200
 
+# Реалізація функціоналу звітності
+class ReportsAPI(Resource):
+    @jwt_required()
+    def get(self):
+        """Отримати звіт по компонентам і замовленням."""
+        identity_json = get_jwt_identity()  # Отримуємо JSON-рядок
+        current_user = json.loads(identity_json)  # Перетворюємо на словник
+
+        # Перевіряємо роль користувача
+        if current_user.get('role') not in ['admin', 'director']:
+            return {"message": "Доступ заборонено"}, 403
+
+        # Статистика по компонентам
+        components = Component.query.all()
+        components_report = [
+            {"name": c.name, "quantity": c.quantity} for c in components
+        ]
+
+        # Статистика по замовленням
+        total_orders = Order.query.count()
+        completed_orders = Order.query.filter_by(status="Завершено").count()
+        pending_orders = Order.query.filter(Order.status != "Завершено").count()
+
+        orders_report = {
+            "total_orders": total_orders,
+            "completed_orders": completed_orders,
+            "pending_orders": pending_orders,
+        }
+
+        # Повертаємо звіт
+        return {
+            "message": "Звіт згенеровано успішно",
+            "components": components_report,
+            "orders": orders_report
+        }, 200
 
 
 
@@ -229,21 +264,22 @@ class UserLogin(Resource):
     def post(self):
         data = request.json
         
-        # Шукаємо користувача у базі
+        # Шукаємо користувача
         user = User.query.filter_by(username=data['username']).first()
         if not user:
             return {"message": "Неправильний логін або пароль"}, 401
         
-        # Перевіряємо хешований пароль
+        # Перевірка пароля
         from werkzeug.security import check_password_hash
         if not check_password_hash(user.password, data['password']):
             return {"message": "Неправильний логін або пароль"}, 401
         
-        # Генеруємо токен з додатковими claims
-        additional_claims = {"role": user.role}
-        access_token = create_access_token(identity=user.username, additional_claims=additional_claims)
-
+        # Генерація токена з identity у форматі JSON-рядка
+        identity = json.dumps({"username": user.username, "role": user.role})
+        access_token = create_access_token(identity=identity)
+        
         return {"access_token": access_token}, 200
+    
 
 class ProtectedRoute(Resource):
     @jwt_required()
@@ -402,3 +438,4 @@ api.add_resource(DirectorRoute, '/api/director')
 api.add_resource(ComponentAPI, '/api/components')
 api.add_resource(UserEdit, '/api/users/edit')
 api.add_resource(UserDelete, '/api/users/delete')
+api.add_resource(ReportsAPI, '/api/reports')
