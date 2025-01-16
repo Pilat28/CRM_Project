@@ -254,8 +254,13 @@ class ProtectedRoute(Resource):
 class OrderAPI(Resource):
     @jwt_required()
     def get(self):
-        """Отримати список усіх замовлень."""
-        orders = Order.query.all()
+        """Отримати список усіх замовлень із фільтрацією за статусом."""
+        status_filter = request.args.get('status')  # Фільтр за статусом
+        if status_filter:
+            orders = Order.query.filter_by(status=status_filter).all()
+        else:
+            orders = Order.query.all()
+
         return [
             {
                 "id": o.id,
@@ -328,7 +333,7 @@ class OrderAPI(Resource):
                 order_type=data['order_type'],
                 quantity=data['quantity'],
                 components=components,
-                status="Очікує"
+                status="Очікує ресурси"
             )
             db.session.add(new_order)
             db.session.commit()
@@ -336,6 +341,39 @@ class OrderAPI(Resource):
 
         else:
             return {"message": "Невідомий тип замовлення"}, 400
+
+    @jwt_required()
+    def put(self):
+        """Оновити статус замовлення."""
+        data = request.json
+        order = Order.query.get(data['id'])
+        if not order:
+            return {"message": "Замовлення не знайдено"}, 404
+
+        # Перевіряємо валідність нового статусу
+        valid_statuses = ["Очікує ресурси", "У виробництві", "На перевірці", "Завершено"]
+        if data.get('status') not in valid_statuses:
+            return {"message": "Невідомий статус"}, 400
+
+        # Оновлюємо статус
+        order.status = data['status']
+        db.session.commit()
+        return {"message": f"Статус замовлення оновлено до '{order.status}'"}, 200
+
+    @role_required('admin')
+    def delete(self):
+        """Видалити замовлення."""
+        order_id = request.args.get('id')  # Отримуємо id з параметрів URL
+        if not order_id:
+            return {"message": "ID не надано"}, 400
+
+        order = Order.query.get(order_id)
+        if not order:
+            return {"message": "Замовлення не знайдено"}, 404
+
+        db.session.delete(order)
+        db.session.commit()
+        return {"message": "Замовлення видалено"}, 200
 
 
 # Додаємо маршрут, доступний тільки адміну
