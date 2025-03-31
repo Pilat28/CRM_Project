@@ -18,6 +18,16 @@
   filter: drop-shadow(0 0 2em #61dafbaa);
 }
 
+.nav-link {
+  color: #212529 !important;  /* або #000 */
+}
+
+.nav-link:hover {
+  color: #0d6efd !important;
+}
+
+
+
 @keyframes logo-spin {
   from {
     transform: rotate(0deg);
