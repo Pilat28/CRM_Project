@@ -7,14 +7,17 @@ from api import api
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
-
+from flask import request, make_response
+from datetime import timedelta
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///crm.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = 'Pilat_da'  # Замість 'your-secret-key' використовуйте свій ключ
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=2)  # або скільки часу потрібно
 
-CORS(app, origins=["http://localhost:5173"])
+CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}})
+
 
 # load_dotenv()
 # app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')

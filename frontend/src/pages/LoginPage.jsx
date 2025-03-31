@@ -28,7 +28,7 @@ function LoginPage() {
   };
 
   return (
-    <div className="container text-center mt-5">
+    <div className="container text-center mt-5" onKeyDown={(e) => e.key === 'Enter' && handleLogin()} tabIndex={0}>
       <h2>🔐 Вхід до системи</h2>
       <div className="form-group my-3">
         <input

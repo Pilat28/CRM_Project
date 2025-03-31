@@ -11,17 +11,23 @@ import json
 api = Api()
 
 
+from flask import jsonify
+
 def role_required(role):
     def decorator(func):
         @wraps(func)
         @jwt_required()
         def wrapper(*args, **kwargs):
-            current_user = get_jwt_identity()
-            claims = get_jwt()
-            if 'role' not in claims:
-                return jsonify({"message": "Роль не вказана в токені"}), 403
-            if claims['role'] != role:
-                return jsonify({"message": "Доступ заборонено"}), 403
+            identity_raw = get_jwt_identity()
+            try:
+                identity = json.loads(identity_raw)  # 🟢 декодуємо
+            except Exception:
+                return {"message": "Помилка обробки токена"}, 400
+
+            user_role = identity.get('role')
+            if user_role != role:
+                return {"message": "Доступ заборонено"}, 403
+
             return func(*args, **kwargs)
         return wrapper
     return decorator
@@ -411,19 +417,6 @@ class OrderAPI(Resource):
         db.session.commit()
         return {"message": "Замовлення видалено"}, 200
 
-
-# Додаємо маршрут, доступний тільки адміну
-import json
-
-class AdminOnlyRoute(Resource):
-    @jwt_required()
-    def get(self):
-        # Отримуємо токен і декодуємо JSON-рядок у словник
-        current_user = json.loads(get_jwt_identity())
-        if current_user['role'] != 'admin':
-            return {"message": "Доступ заборонено"}, 403
-
-        return {"message": "Ласкаво просимо, адмін!"}, 200
 
 
 # Додаємо маршрут для OrderAPI
