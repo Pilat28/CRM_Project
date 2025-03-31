@@ -4,43 +4,51 @@ import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
 function LoginPage() {
+  const { login } = useContext(AuthContext);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const handleLogin = async () => {
     try {
-      const res = await axios.post('http://127.0.0.1:5000/api/login', { username, password });
-      login(res.data.access_token); // Зберігаємо токен в контексті
-      navigate('/dashboard');       // Перехід до кабінету
-    } catch (err) {
-      alert('Помилка входу: ' + err.response?.data?.message || 'Сервер недоступний');
+      const res = await axios.post('http://127.0.0.1:5000/api/login', {
+        username,
+        password,
+      });
+
+      const token = res.data.access_token;
+      login(token); // контекст: зберігає токен + авторизує
+      navigate('/dashboard'); // редирект
+    } catch (error) {
+      console.error("Login error:", error); // для дебагу в консолі
+      const message = error.response?.data?.message || "Невідома помилка";
+      alert("Помилка входу: " + message);
     }
+    
   };
 
   return (
-    <div className="container mt-5">
-      <div className="card p-4 shadow">
-        <h2 className="mb-3">🔐 Вхід</h2>
+    <div className="container text-center mt-5">
+      <h2>🔐 Вхід до системи</h2>
+      <div className="form-group my-3">
         <input
           type="text"
-          className="form-control mb-2"
-          placeholder="Ім’я користувача"
+          placeholder="Ім'я користувача"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
+          className="form-control"
         />
+      </div>
+      <div className="form-group my-3">
         <input
           type="password"
-          className="form-control mb-3"
           placeholder="Пароль"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          className="form-control"
         />
-        <button className="btn btn-primary" onClick={handleLogin}>
-          Увійти
-        </button>
       </div>
+      <button onClick={handleLogin} className="btn btn-primary">Увійти</button>
     </div>
   );
 }
