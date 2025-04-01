@@ -1,55 +1,55 @@
-import React, { useContext } from 'react';
-import { BrowserRouter as Router, Routes, Route, NavLink, useNavigate } from 'react-router-dom';
-import HomePage from './pages/HomePage';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
+import HomePage from './pages/HomePage';
 import Dashboard from './pages/Dashboard';
+import AdminDashboard from './pages/AdminDashboard';
+import DirectorDashboard from './pages/DirectorDashboard';
+import WarehouseDashboard from './pages/WarehouseDashboard';
+import ProductionDashboard from './pages/ProductionDashboard';
+import { useContext } from 'react';
 import { AuthContext } from './context/AuthContext';
-
-function Navbar() {
-  const location = window.location.pathname;
-  const { isAuthenticated, logout } = useContext(AuthContext);
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
-
-  const isHome = location === '/';
-
-  return (
-    <nav className="navbar navbar-expand-lg bg-white shadow-sm px-4 py-3 mb-4">
-      <div className="container-fluid d-flex justify-content-between align-items-center">
-        <span className="navbar-brand">CRM</span>
-        <div className={`d-flex ${isHome ? 'justify-content-center w-100' : ''}`}>
-        <NavLink to="/" className="nav-link text-dark">🏠 Головна</NavLink>
-          {!isAuthenticated && (
-            <NavLink to="/login" className="nav-link text-dark">🔐 Вхід</NavLink>
-          )}
-          {isAuthenticated && (
-            <>
-              <NavLink to="/dashboard" className="nav-link text-dark">📊 Кабінет</NavLink>
-              <button className="btn btn-sm btn-outline-danger ms-2" onClick={handleLogout}>Вийти</button>
-            </>
-          )}
-        </div>
-      </div>
-    </nav>
-  );
-}
+import { jwtDecode } from 'jwt-decode';
+import Navbar from './components/Navbar';
 
 
 function App() {
+  const { token } = useContext(AuthContext);
+
+  const getRole = () => {
+    if (!token) return null;
+    try {
+      const decoded = jwtDecode(token);
+      return JSON.parse(decoded.sub)?.role;
+    } catch {
+      return null;
+    }
+  };
+
+  const role = getRole();
+
+  const ProtectedRoute = ({ children, allowed }) => {
+    if (!token) return <Navigate to="/" />;
+    if (!allowed.includes(role)) return <Navigate to="/not-found" />;
+    return children;
+  };
+
   return (
     <Router>
       <Navbar />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-      </Routes>
+      <div className="container mt-4">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/director" element={<DirectorDashboard />} />
+          <Route path="/warehouse" element={<WarehouseDashboard />} />
+          <Route path="/production" element={<ProductionDashboard />} />
+        </Routes>
+      </div>
     </Router>
   );
+  
 }
 
 export default App;
