@@ -1,5 +1,12 @@
 import React from 'react';
 
-export default function WarehouseDashboard() {
-  return <h1>...</h1>;
+function WarehouseDashboard() {
+  return (
+    <div className="container mt-5">
+      <h2>🏬 Панель складу</h2>
+      <p>Тут ви можете обробляти замовлення на комплектуючі, оновлювати залишки та передавати на виробництво.</p>
+    </div>
+  );
 }
+
+export default WarehouseDashboard;

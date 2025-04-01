@@ -7,3 +7,11 @@ python app.py
 
 запуск фронтенду
 npm run dev
+
+
+
+
+2	Ігор Павленко	production	
+3	Антон Склад	warehouse	
+4	Юрій Васильович	director	
+5	Микола	admin
