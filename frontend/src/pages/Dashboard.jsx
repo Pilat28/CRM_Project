@@ -8,6 +8,9 @@ function Dashboard() {
   const [role, setRole] = useState(null);
   const [users, setUsers] = useState([]);
   const [form, setForm] = useState({ username: '', password: '', role: '' });
+  const [editUserId, setEditUserId] = useState(null);
+  const [editForm, setEditForm] = useState({ username: '', password: '', role: '' });
+
 
   useEffect(() => {
     if (token) {
@@ -63,6 +66,26 @@ function Dashboard() {
     }
   };
 
+  const handleEditUser = async () => {
+    try {
+      await axios.put('http://127.0.0.1:5000/api/users/edit', {
+        id: editUserId,
+        ...editForm,
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setEditUserId(null);
+      setEditForm({ username: '', password: '', role: '' });
+      fetchUsers();
+    } catch (err) {
+      alert('Помилка редагування користувача: ' + err.response?.data?.message);
+    }
+  };
+  
+
+
   return (
     <div className="container">
       <h2 className="mb-4">📊 Особистий кабінет ({role})</h2>
@@ -83,11 +106,60 @@ function Dashboard() {
               {users.map((u) => (
                 <tr key={u.id}>
                   <td>{u.id}</td>
-                  <td>{u.username}</td>
-                  <td>{u.role}</td>
                   <td>
-                    {/* TODO: Кнопка редагування */}
-                    <button className="btn btn-sm btn-danger" onClick={() => handleDeleteUser(u.id)}>Видалити</button>
+                    {editUserId === u.id ? (
+                      <input
+                        className="form-control"
+                        value={editForm.username}
+                        onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
+                      />
+                    ) : (
+                      u.username
+                    )}
+                  </td>
+                  <td>
+                    {editUserId === u.id ? (
+                      <select
+                        className="form-select"
+                        value={editForm.role}
+                        onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                      >
+                        <option value="admin">Адмін</option>
+                        <option value="warehouse">Склад</option>
+                        <option value="production">Виробництво</option>
+                        <option value="director">Директор</option>
+                      </select>
+                    ) : (
+                      u.role
+                    )}
+                  </td>
+                  <td>
+                    {editUserId === u.id ? (
+                      <>
+                        <input
+                          type="password"
+                          className="form-control mb-1"
+                          placeholder="Новий пароль"
+                          value={editForm.password}
+                          onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                        />
+                        <button className="btn btn-sm btn-success me-2" onClick={handleEditUser}>Зберегти</button>
+                        <button className="btn btn-sm btn-secondary" onClick={() => setEditUserId(null)}>Скасувати</button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          className="btn btn-sm btn-primary me-2"
+                          onClick={() => {
+                            setEditUserId(u.id);
+                            setEditForm({ username: u.username, role: u.role, password: '' });
+                          }}
+                        >
+                          Редагувати
+                        </button>
+                        <button className="btn btn-sm btn-danger" onClick={() => handleDeleteUser(u.id)}>Видалити</button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}

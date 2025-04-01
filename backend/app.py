@@ -29,8 +29,8 @@ api.init_app(app)
 # Налаштовуємо JWT
 jwt = JWTManager(app)
 
-with app.app_context():
-    db.create_all()
+# with app.app_context():
+#     db.create_all()
 
 @app.route('/')
 def home():

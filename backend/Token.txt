@@ -2,5 +2,8 @@
 
 запуск бекенду
 
-venv\Scripts\activate  # якщо ще не активовано
+venv\Scripts\activate
 python app.py
+
+запуск фронтенду
+npm run dev
