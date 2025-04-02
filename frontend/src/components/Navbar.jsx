@@ -65,6 +65,12 @@ function Navbar() {
         {token && (
           <button className="btn btn-outline-danger" onClick={handleLogout}>Вийти</button>
         )}
+        {role === 'admin' && (
+          <li className="nav-item">
+            <Link className="nav-link" to="/order-builder">🛠 Конструктор замовлень</Link>
+          </li>
+        )}
+
       </div>
     </nav>
   );

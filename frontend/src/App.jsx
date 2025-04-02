@@ -10,6 +10,7 @@ import { useContext } from 'react';
 import { AuthContext } from './context/AuthContext';
 import { jwtDecode } from 'jwt-decode';
 import Navbar from './components/Navbar';
+import OrderBuilder from './pages/OrderBuilder';
 
 
 function App() {
@@ -45,6 +46,7 @@ function App() {
           <Route path="/director" element={<DirectorDashboard />} />
           <Route path="/warehouse" element={<WarehouseDashboard />} />
           <Route path="/production" element={<ProductionDashboard />} />
+          <Route path="/order-builder" element={<OrderBuilder />} />
         </Routes>
       </div>
     </Router>
