@@ -38,3 +38,11 @@ class OrderHistory(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     items = db.Column(db.Text)
     created_by = db.Column(db.String)
+
+class InventoryLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    component_id = db.Column(db.Integer, db.ForeignKey('component.id'))
+    quantity_changed = db.Column(db.Integer)
+    reason = db.Column(db.String(255))
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    modified_by = db.Column(db.String(100))

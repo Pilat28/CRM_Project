@@ -4,9 +4,11 @@ from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity
 from flask_cors import CORS
 from datetime import timedelta, datetime
-from models import db, Component, Order, Defect, Template, OrderHistory
+from models import db, Component, Order, Defect, Template, OrderHistory, InventoryLog
 from api import api
 import json
+
+
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///crm.db'
@@ -14,7 +16,11 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = 'Pilat_da'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=2)
 
-CORS(app, resources={r"/*": {"origins": "http://localhost:5173"}}, supports_credentials=True)
+CORS(app, resources={r"/*": {
+    "origins": "*",
+    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "allow_headers": ["Content-Type", "Authorization"]
+}}, supports_credentials=True)
 
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -125,6 +131,54 @@ def get_all_components():
         {'id': c.id, 'name': c.name, 'quantity': c.quantity}
         for c in components
     ]
+    return jsonify(result), 200
+
+@app.route('/api/components/update_quantity', methods=['POST'])
+@jwt_required()
+def update_component_quantity():
+    data = request.get_json()
+    component_id = data.get('component_id')
+    quantity_change = data.get('quantity_change')
+    reason = data.get('reason')
+    user = get_jwt_identity()
+
+    if not all([component_id, quantity_change, reason]):
+        return jsonify({'message': 'Усі поля обов’язкові.'}), 400
+
+    component = Component.query.get(component_id)
+    if not component:
+        return jsonify({'message': 'Компонент не знайдено.'}), 404
+
+    component.quantity += quantity_change  # + або -
+    log = InventoryLog(
+        component_id=component_id,
+        quantity_changed=quantity_change,
+        reason=reason,
+        modified_by=user
+    )
+
+    db.session.add(log)
+    db.session.commit()
+
+    return jsonify({'message': 'Кількість оновлено.'}), 200
+
+@app.route('/api/inventory/logs', methods=['GET'])
+@jwt_required()
+def get_inventory_logs():
+    user = get_jwt_identity()
+    if json.loads(user).get('role') != 'director':
+        return jsonify({'message': 'Доступ заборонено'}), 403
+
+    logs = InventoryLog.query.order_by(InventoryLog.timestamp.desc()).all()
+    result = [{
+        'id': log.id,
+        'component_id': log.component_id,
+        'quantity_changed': log.quantity_changed,
+        'reason': log.reason,
+        'timestamp': log.timestamp.isoformat(),
+        'modified_by': log.modified_by
+    } for log in logs]
+
     return jsonify(result), 200
 
 

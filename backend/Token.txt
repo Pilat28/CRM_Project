@@ -11,7 +11,10 @@ npm run dev
 
 
 
-2	Ігор Павленко	production	
-3	Антон Склад	warehouse	
-4	Юрій Васильович	director	
-5	Микола	admin
+ID	Ім’я користувача	Роль	Дії
+1	Микола	admin	
+2	Васильович	director	
+3	Антон	warehouse	
+4	Ігор	production	
+5	Ігор Спутнік	production	
+6	Віталій	production 1234

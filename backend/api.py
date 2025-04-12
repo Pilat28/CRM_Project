@@ -2,6 +2,7 @@ from flask_restful import Resource, Api
 from flask import request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from models import db, User, Component, Order
+from models import InventoryLog
 from functools import wraps
 from werkzeug.security import generate_password_hash
 from flask_jwt_extended import get_jwt
@@ -237,6 +238,77 @@ class ComponentAPI(Resource):
         db.session.commit()
         return {"message": "Компонент видалено"}, 200
 
+class ComponentAddByWarehouse(Resource):
+    @role_required('warehouse')
+    def post(self):
+        data = request.get_json()
+        name = data.get('name')
+        quantity = data.get('quantity')
+        user = get_jwt_identity()
+
+        if not name:
+            return {"message": "Назва обов'язкова"}, 400
+
+        try:
+            quantity = int(quantity)
+        except (ValueError, TypeError):
+            return {"message": "Кількість має бути числом"}, 400
+
+        component = Component.query.filter(Component.name.ilike(name)).first()
+
+        if component:
+            component.quantity += quantity
+        else:
+            component = Component(name=name, quantity=quantity)
+            db.session.add(component)
+            db.session.flush()  # Отримаємо ID для логів
+
+        # лог для директора
+        log = InventoryLog(
+            component_id=component.id,
+            quantity_changed=quantity,
+            reason="Додавання зі складу",
+            modified_by=json.loads(user)['username']
+        )
+        db.session.add(log)
+        db.session.commit()
+
+        return {"message": "Компонент додано або оновлено"}, 200
+
+
+
+class InventoryUpdateAPI(Resource):
+    @jwt_required()
+    @role_required('warehouse')
+    def post(self):
+        data = request.get_json()
+        component_id = data.get('id')
+        delta = data.get('delta')
+        reason = data.get('reason')
+        user = get_jwt_identity()
+
+        if component_id is None or delta is None:
+            return {"message": "Невірні дані"}, 400
+
+
+        component = Component.query.get(component_id)
+        if not component:
+            return {"message": "Компонент не знайдено"}, 404
+
+        component.quantity += delta
+
+        # логуємо зміну
+        log = InventoryLog(
+            component_id=component.id,
+            quantity_changed=delta,
+            reason=reason or "Зміна без причини",
+            modified_by=json.loads(user)['username']
+        )
+        db.session.add(log)
+        db.session.commit()
+
+        return {"message": "Кількість оновлена"}, 200
+
 
 # Додаємо маршрут до API
 api.add_resource(UserManagementAPI, '/api/users')
@@ -432,3 +504,5 @@ api.add_resource(ComponentAPI, '/api/components')
 api.add_resource(UserEdit, '/api/users/edit')
 api.add_resource(UserDelete, '/api/users/delete')
 api.add_resource(ReportsAPI, '/api/reports')
+api.add_resource(ComponentAddByWarehouse, '/api/components/add_by_warehouse')
+api.add_resource(InventoryUpdateAPI, '/api/inventory/update')
